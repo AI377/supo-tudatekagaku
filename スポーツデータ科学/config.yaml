@@ -1,0 +1,88 @@
+# ============================================================
+# 共通設定ファイル
+# 3つのコードはこの config を読み込んで動作する。
+# コマンドライン引数で個別に上書きも可能。
+# ============================================================
+
+# ---- ボール検出（YOLO）----
+detect:
+  model_path: "models/ball_yolo.pt"   # 既存フットサル用YOLOカスタムモデル。無い/見つからない場合は色検出にフォールバック
+  ball_class_id: null                 # null なら "ball" という名前のクラスを自動探索。数値ならそのクラスIDを使用
+  conf_threshold: 0.25                # 信頼度閾値
+  imgsz: 640                          # 推論画像サイズ
+  device: "auto"                      # "auto" | "cpu" | "cuda" | "0"
+  frame_skip: 0                       # n>0 で n フレームごとに1枚だけ処理（長尺動画の高速化）
+
+# ---- 色ベース検出のフォールバック（HSV）----
+# YOLOモデルが使えないときに使用。フットサルボールの色に合わせて調整すること。
+color_fallback:
+  enabled: true
+  hsv_lower: [20, 100, 100]   # 例：黄色～オレンジ系
+  hsv_upper: [35, 255, 255]
+  min_area: 80                # 検出する最小輪郭面積[px]
+
+# ---- 簡易トラッキング ----
+tracking:
+  use_prev_nearest: true      # 複数検出時、前フレームのボールに最も近いものを採用
+  max_jump_norm: 0.30         # 前フレームから対角比でこれ以上飛んだら採用しない（誤検出抑制）
+
+# ---- 中心保持の判定 ----
+center_hold:
+  metric: "deg"               # "deg"（視野角）| "norm"（対角正規化）
+  threshold: 10.0             # この値以内なら「中心保持」とみなす（deg なら度、norm なら 0-1）
+
+# ---- 欠損フレームの扱い ----
+missing:
+  interpolate: false          # true で未検出フレームを線形補間（補間フラグを別途記録）
+
+# ============================================================
+# コード①：GoPro（目隠しあり）
+# ============================================================
+gopro:
+  video_path: "data/blindfold_gopro.mp4"
+  output_csv: "outputs/code1_gopro_perframe.csv"
+  output_summary: "outputs/code1_gopro_summary.json"
+  overlay_video: "outputs/code1_gopro_overlay.mp4"  # 不要なら null
+  fov_h_deg: 118.0            # GoProの水平視野角[度]。視野角換算に使用（広角設定で要調整）
+  # 魚眼歪み補正（任意）。キャリブレーション済みなら K, D を入れる。null なら補正しない。
+  fisheye:
+    enabled: false
+    K: null   # 例: [[fx,0,cx],[0,fy,cy],[0,0,1]]
+    D: null   # 例: [k1,k2,k3,k4]
+
+# ============================================================
+# コード②：Tobii（目隠し無し）
+# ============================================================
+tobii:
+  video_path: "data/vision_tobii_scene.mp4"
+  gaze_path: "data/vision_tobii_gaze.tsv"
+  output_csv: "outputs/code2_tobii_perframe.csv"
+  output_summary: "outputs/code2_tobii_summary.json"
+  overlay_video: "outputs/code2_tobii_overlay.mp4"  # 不要なら null
+  fov_h_deg: 95.0            # Tobii Pro Glasses 3 シーンカメラの水平視野角[度]（公称約95°）
+  # gaze データの列名マッピング（Pro Lab の TSV / gazedata から実ファイルに合わせて変更）
+  gaze_columns:
+    timestamp: "timestamp"   # 秒。別単位なら gaze_time_unit で調整
+    x: "gaze2d_x"            # 0-1 正規化座標
+    y: "gaze2d_y"
+    validity: "validity"     # 有効=1/"valid" 等。無ければ null
+  gaze_time_unit: "s"        # "s" | "ms" | "us"
+  gaze_valid_value: 1        # validity 列がこの値のとき有効とみなす（文字列 "valid" 等も可）
+  sync_offset_sec: 0.0       # 動画とgazeのタイムスタンプのずれ補正（gaze時刻に加算）
+  gaze_resample: "nearest"   # "nearest"（最近傍）| "mean"（フレーム区間平均）
+
+# ============================================================
+# コード③：比較・可視化
+# ============================================================
+compare:
+  code1_csv: "outputs/code1_gopro_perframe.csv"
+  code2_csv: "outputs/code2_tobii_perframe.csv"
+  metric: "deg"              # 比較に使う共通指標 "deg" | "norm"
+  out_dir: "outputs/compare"
+  run_stat_test: true        # Mann-Whitney U を実行（注意書き付き）
+  trim:                      # 比較区間のトリミング（秒）。null なら全区間
+    start_sec: null
+    end_sec: null
+  labels:
+    blindfold: "目隠しあり(視覚なし)"
+    vision: "目隠し無し(視覚あり)"

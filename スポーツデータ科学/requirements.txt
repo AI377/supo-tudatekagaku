@@ -1,0 +1,9 @@
+opencv-python>=4.8
+numpy>=1.24
+pandas>=2.0
+matplotlib>=3.7
+scipy>=1.10
+pyyaml>=6.0
+ultralytics>=8.1      # YOLO（既存カスタムモデルを使う場合）
+japanize-matplotlib   # 図の日本語表示（任意だが推奨）
+tabulate              # レポートの表生成（任意）
